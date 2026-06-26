@@ -38,7 +38,7 @@ npm publish
 After npm publishing, users can install the Pi extension with:
 
 ```bash
-pi install npm:@hesamkorki/pi-ide
+pi install npm:@hesam.korki/pi-ide
 ```
 
 ## Git policy
