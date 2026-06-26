@@ -171,33 +171,6 @@ You can also click an agent row in the status panel to switch to it.
 - The UI is intentionally minimal. It is not a replacement for tmux, terminal multiplexers, or full IDE project views.
 - Emoji alignment depends on your terminal/font. If spacing looks odd, switch to a font with better emoji width support or patch the icons locally.
 
-## Publishing to the Pi package gallery
-
-The Pi package gallery at `pi.dev/packages` lists packages published to npm. To make a release visible there:
-
-1. Make sure `package.json` has:
-   - `"keywords": ["pi-package", ...]`
-   - a `"pi"` manifest pointing at `./extensions`
-2. Log in to npm:
-
-   ```bash
-   npm adduser
-   ```
-
-3. Publish:
-
-   ```bash
-   npm publish
-   ```
-
-4. Install from npm once published:
-
-   ```bash
-   pi install npm:pi-ide
-   ```
-
-The GitHub install path remains useful for development and for users who want the latest unreleased version.
-
 ## Development
 
 Clone the repo:
