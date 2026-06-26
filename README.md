@@ -84,8 +84,6 @@ You can verify it is installed with:
 pi list
 ```
 
-> `pi.dev/packages` indexes Pi packages published to npm with the `pi-package` keyword. GitHub installs work, but npm publishing is what makes the package appear in the public gallery.
-
 ### 2. Install the Neovim plugin
 
 With `lazy.nvim`:
