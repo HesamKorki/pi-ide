@@ -1,0 +1,31 @@
+{
+  "name": "pi-ide",
+  "version": "0.1.0",
+  "description": "A minimal Neovim workspace for supervising multiple pi agent shells without losing traditional dev tools.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "neovim",
+    "nvim",
+    "agent",
+    "ide"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/HesamKorki/pi-ide.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HesamKorki/pi-ide/issues"
+  },
+  "homepage": "https://github.com/HesamKorki/pi-ide#readme",
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
