@@ -12,6 +12,15 @@
     "ide"
   ],
   "license": "MIT",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "extensions",
+    "lua"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/HesamKorki/pi-ide.git"

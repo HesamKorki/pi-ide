@@ -66,6 +66,14 @@ You should install both halves from the same repository.
 
 This installs the Pi extension so `pi` can emit lifecycle events for Neovim.
 
+If installing from npm:
+
+```bash
+pi install npm:pi-ide
+```
+
+If installing directly from GitHub:
+
 ```bash
 pi install git:github.com/HesamKorki/pi-ide
 ```
@@ -76,7 +84,7 @@ You can verify it is installed with:
 pi list
 ```
 
-> The package is discoverable by Pi's package gallery because `package.json` includes the `pi-package` keyword and a `pi.extensions` manifest.
+> `pi.dev/packages` indexes Pi packages published to npm with the `pi-package` keyword. GitHub installs work, but npm publishing is what makes the package appear in the public gallery.
 
 ### 2. Install the Neovim plugin
 
@@ -162,6 +170,33 @@ You can also click an agent row in the status panel to switch to it.
 - Generic shell commands do not emit Pi lifecycle events; their terminal status only changes when the shell exits.
 - The UI is intentionally minimal. It is not a replacement for tmux, terminal multiplexers, or full IDE project views.
 - Emoji alignment depends on your terminal/font. If spacing looks odd, switch to a font with better emoji width support or patch the icons locally.
+
+## Publishing to the Pi package gallery
+
+The Pi package gallery at `pi.dev/packages` lists packages published to npm. To make a release visible there:
+
+1. Make sure `package.json` has:
+   - `"keywords": ["pi-package", ...]`
+   - a `"pi"` manifest pointing at `./extensions`
+2. Log in to npm:
+
+   ```bash
+   npm adduser
+   ```
+
+3. Publish:
+
+   ```bash
+   npm publish
+   ```
+
+4. Install from npm once published:
+
+   ```bash
+   pi install npm:pi-ide
+   ```
+
+The GitHub install path remains useful for development and for users who want the latest unreleased version.
 
 ## Development
 
