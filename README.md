@@ -69,7 +69,7 @@ This installs the Pi extension so `pi` can emit lifecycle events for Neovim.
 If installing from npm:
 
 ```bash
-pi install npm:pi-ide
+pi install npm:@hesamkorki/pi-ide
 ```
 
 If installing directly from GitHub:

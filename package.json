@@ -1,5 +1,5 @@
 {
-  "name": "pi-ide",
+  "name": "@hesamkorki/pi-ide",
   "version": "0.1.0",
   "description": "A minimal Neovim workspace for supervising multiple pi agent shells without losing traditional dev tools.",
   "keywords": [
