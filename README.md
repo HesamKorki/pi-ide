@@ -143,7 +143,8 @@ Default keymaps installed by `require("pi_ide").setup()`:
 | Key | Action |
 | --- | --- |
 | `<leader>aw` | Open workspace |
-| `<leader>aa` | Focus/show the active agent shell in the main area |
+| `<leader>aa` | Focus/show the active agent shell; rebuilds workspace if panes are missing |
+| `<leader>ag` | Alias for going to the active agent shell; rebuilds workspace if panes are missing |
 | `<leader>as` | Focus the scratch shell |
 | `<leader>an` | New agent shell |
 | `<leader>ar` | Rename active agent shell |
@@ -161,6 +162,14 @@ You can also click an agent row in the status panel to switch to it.
 3. Edit as usual.
 4. Press `<leader>aa` to return to the active agent shell.
 5. Use the scratch shell for quick commands that should not pollute agent sessions.
+
+## Troubleshooting
+
+### Workspace looks duplicated or lost after closing an edited file
+
+`pi-ide` treats the left/main window as reusable: agent terminal, file editing, then back to agent. If you close the main editing window with `:close`/`:q`, Neovim may leave focus in the status or scratch pane. Run `:AgentWorkspace` or press `<leader>aw` to rebuild the layout around the active agent buffer. `<leader>aa` returns to the active agent terminal once the layout exists.
+
+The plugin guards against reusing the status/scratch panes as the main area, but the intended flow is usually: open a file with `<leader>ff`, edit it, then press `<leader>aa` to return to the active agent terminal instead of closing the main window.
 
 ## Limitations
 
