@@ -1,7 +1,7 @@
 local M = {}
 
 local uv = vim.uv or vim.loop
-local state = {
+local state = _G.__pi_ide_state or {
   tabs = {},
   active = 1,
   status_buf = nil,
@@ -13,6 +13,7 @@ local state = {
   event_file = "/tmp/pi-agent-status-" .. (vim.env.USER or "unknown") .. "/events.jsonl",
   event_pos = 0,
 }
+_G.__pi_ide_state = state
 
 local icons = {
   idle = "🟢",
@@ -23,12 +24,126 @@ local icons = {
   unknown = "❔",
 }
 
+local function win_valid(win)
+  return win and vim.api.nvim_win_is_valid(win)
+end
+
+local function buf_valid(buf)
+  return buf and vim.api.nvim_buf_is_valid(buf)
+end
+
+local install_workspace_buffer_keymaps
+
+local function mark_buf_role(buf, role)
+  if buf_valid(buf) then
+    vim.b[buf].pi_ide_role = role
+    if role == "agent" or role == "scratch" or role == "status" then
+      install_workspace_buffer_keymaps(buf)
+    end
+  end
+end
+
+local function mark_win_role(win, role)
+  if win_valid(win) then
+    vim.w[win].pi_ide_role = role
+    -- Snacks picker honors snacks_main as a preferred target. Keep that tag
+    -- exclusively on pi-ide's main pane so status/scratch stay sticky panes.
+    vim.w[win].snacks_main = role == "main"
+  end
+end
+
+local function buf_role(buf)
+  return buf_valid(buf) and vim.b[buf].pi_ide_role or nil
+end
+
+local function win_role(win)
+  return win_valid(win) and vim.w[win].pi_ide_role or nil
+end
+
+function install_workspace_buffer_keymaps(buf)
+  if not buf_valid(buf) then
+    return
+  end
+
+  vim.keymap.set({ "n", "t" }, "<leader>ff", function()
+    if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
+      vim.cmd("stopinsert")
+    end
+    M.find_files()
+  end, { buffer = buf, desc = "Find files in pi-ide main area" })
+
+  vim.keymap.set({ "n", "t" }, "<leader>ag", function()
+    if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
+      vim.cmd("stopinsert")
+    end
+    M.go_agent()
+  end, { buffer = buf, desc = "Go to active agent" })
+
+  vim.keymap.set({ "n", "t" }, "<leader>aa", function()
+    if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
+      vim.cmd("stopinsert")
+    end
+    M.go_agent()
+  end, { buffer = buf, desc = "Focus active agent" })
+end
+
+local function is_status_buf(buf)
+  if not buf_valid(buf) then
+    return false
+  end
+  if buf == state.status_buf or buf_role(buf) == "status" then
+    return true
+  end
+  return vim.bo[buf].filetype == "agent-workspace" or vim.api.nvim_buf_get_name(buf):match("Agent Workspace$") ~= nil
+end
+
+local function is_scratch_buf(buf)
+  return buf_valid(buf) and (buf == state.scratch_buf or buf_role(buf) == "scratch")
+end
+
+local function is_managed_side_win(win)
+  if not win_valid(win) then
+    return false
+  end
+  local role = win_role(win)
+  if role == "status" or role == "scratch" then
+    return true
+  end
+  if win == state.status_win or win == state.scratch_win then
+    return true
+  end
+  local buf = vim.api.nvim_win_get_buf(win)
+  return is_status_buf(buf) or is_scratch_buf(buf)
+end
+
+local function find_window_showing_buf(buf)
+  if not buf_valid(buf) then
+    return nil
+  end
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == buf then
+      return win
+    end
+  end
+  return nil
+end
+
+local function find_unmanaged_window()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if not is_managed_side_win(win) then
+      return win
+    end
+  end
+  return nil
+end
+
 local function status_dir()
   return "/tmp/pi-agent-status-" .. (vim.env.USER or "unknown")
 end
 
 local function ensure_status_buf()
   if state.status_buf and vim.api.nvim_buf_is_valid(state.status_buf) then
+    mark_buf_role(state.status_buf, "status")
     return state.status_buf
   end
   state.status_buf = vim.api.nvim_create_buf(false, true)
@@ -37,6 +152,7 @@ local function ensure_status_buf()
   vim.bo[state.status_buf].swapfile = false
   vim.bo[state.status_buf].filetype = "agent-workspace"
   vim.api.nvim_buf_set_name(state.status_buf, "Agent Workspace")
+  mark_buf_role(state.status_buf, "status")
   vim.keymap.set("n", "<LeftRelease>", function()
     local line = vim.api.nvim_win_get_cursor(0)[1]
     local idx = line - 1
@@ -71,7 +187,7 @@ local function render_status()
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
 
-  if state.status_win and vim.api.nvim_win_is_valid(state.status_win) then
+  if win_valid(state.status_win) then
     vim.api.nvim_win_set_height(state.status_win, math.min(6, math.max(3, #lines)))
   end
 end
@@ -80,26 +196,69 @@ local function active_tab()
   return state.tabs[state.active]
 end
 
+local function ensure_main_win(preferred_buf)
+  -- Keep the side panes as side panes. If the main window was closed while
+  -- editing a file, do not silently reuse the focused status/scratch pane as
+  -- the main area; create/recover a real main window instead.
+  if win_valid(state.main_win) and not is_managed_side_win(state.main_win) then
+    mark_win_role(state.main_win, "main")
+    return state.main_win
+  end
+
+  local existing = find_window_showing_buf(preferred_buf)
+  if existing and not is_managed_side_win(existing) then
+    state.main_win = existing
+    mark_win_role(existing, "main")
+    return existing
+  end
+
+  local current = vim.api.nvim_get_current_win()
+  if current and not is_managed_side_win(current) then
+    state.main_win = current
+    mark_win_role(current, "main")
+    return current
+  end
+
+  local unmanaged = find_unmanaged_window()
+  if unmanaged then
+    state.main_win = unmanaged
+    mark_win_role(unmanaged, "main")
+    return unmanaged
+  end
+
+  -- Only managed panes remain. Split off a new window that can safely become
+  -- the main area without overwriting the status or scratch windows.
+  vim.cmd("topleft vertical new")
+  state.main_win = vim.api.nvim_get_current_win()
+  mark_win_role(state.main_win, "main")
+  return state.main_win
+end
+
 function M.focus_agent()
   local tab = active_tab()
   if not tab then
     M.new()
     tab = active_tab()
   end
-  if not (state.main_win and vim.api.nvim_win_is_valid(state.main_win)) then
-    state.main_win = vim.api.nvim_get_current_win()
+  if not tab or not buf_valid(tab.buf) then
+    vim.notify("No valid active agent buffer", vim.log.levels.WARN)
+    return
   end
-  vim.api.nvim_set_current_win(state.main_win)
-  vim.api.nvim_win_set_buf(state.main_win, tab.buf)
+
+  local main_win = ensure_main_win(tab.buf)
+  vim.api.nvim_set_current_win(main_win)
+  vim.api.nvim_win_set_buf(main_win, tab.buf)
+  mark_win_role(main_win, "main")
+  mark_buf_role(tab.buf, "agent")
   if vim.bo[tab.buf].buftype == "terminal" then
     vim.cmd("startinsert")
   end
 end
 
 function M.focus_scratch()
-  if state.scratch_win and vim.api.nvim_win_is_valid(state.scratch_win) then
+  if win_valid(state.scratch_win) then
     vim.api.nvim_set_current_win(state.scratch_win)
-    if state.scratch_buf and vim.bo[state.scratch_buf].buftype == "terminal" then
+    if buf_valid(state.scratch_buf) and vim.bo[state.scratch_buf].buftype == "terminal" then
       vim.cmd("startinsert")
     end
   end
@@ -171,9 +330,10 @@ local function start_timer()
   end))
 end
 
-local function create_terminal_buffer(name, cmd, id)
+local function create_terminal_buffer(name, cmd, id, role)
   local buf = vim.api.nvim_create_buf(false, false)
   vim.api.nvim_buf_set_name(buf, name)
+  mark_buf_role(buf, role or "agent")
   vim.api.nvim_set_current_buf(buf)
   vim.fn.termopen(cmd, {
     env = {
@@ -198,11 +358,9 @@ function M.new(name, cmd)
   cmd = cmd and cmd ~= "" and cmd or (vim.o.shell or "bash")
   local id = string.format("nvim-%d-%d", uv.os_getpid(), #state.tabs + 1)
 
-  if not (state.main_win and vim.api.nvim_win_is_valid(state.main_win)) then
-    state.main_win = vim.api.nvim_get_current_win()
-  end
+  ensure_main_win()
   vim.api.nvim_set_current_win(state.main_win)
-  local buf = create_terminal_buffer("agent:" .. name, cmd, id)
+  local buf = create_terminal_buffer("agent:" .. name, cmd, id, "agent")
 
   table.insert(state.tabs, { id = id, name = name, cmd = cmd, buf = buf, status = "idle" })
   state.active = #state.tabs
@@ -234,33 +392,107 @@ function M.rename(name)
 end
 
 local function ensure_scratch()
-  if state.scratch_buf and vim.api.nvim_buf_is_valid(state.scratch_buf) then
+  if not win_valid(state.scratch_win) then
     return
   end
-  if not (state.scratch_win and vim.api.nvim_win_is_valid(state.scratch_win)) then
+  if buf_valid(state.scratch_buf) then
+    mark_buf_role(state.scratch_buf, "scratch")
+    vim.api.nvim_win_set_buf(state.scratch_win, state.scratch_buf)
     return
   end
+
   vim.api.nvim_set_current_win(state.scratch_win)
   local buf = vim.api.nvim_create_buf(false, false)
   vim.api.nvim_buf_set_name(buf, "agent:scratch")
+  mark_buf_role(buf, "scratch")
   vim.api.nvim_win_set_buf(state.scratch_win, buf)
   vim.fn.termopen(vim.o.shell or "bash")
   state.scratch_buf = buf
 end
 
-function M.open()
-  start_timer()
+local function adopt_existing_workspace()
+  -- Hot-reload safety: if this module was reloaded while an older workspace was
+  -- already open, the old Lua-local state is gone but the terminal/status
+  -- buffers still exist. Recover the obvious pieces before rebuilding.
+  if #state.tabs > 0 then
+    return
+  end
 
-  -- Build the workspace from a single full-height main window. Without this,
-  -- invoking AgentWorkspace from an existing split can leave the active agent
-  -- terminal trapped in a short top pane with unused space below.
+  local terminals = {}
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.bo[buf].buftype == "terminal" then
+      table.insert(terminals, { win = win, buf = buf, width = vim.api.nvim_win_get_width(win) })
+    elseif is_status_buf(buf) then
+      state.status_win = win
+      state.status_buf = buf
+      mark_win_role(win, "status")
+      mark_buf_role(buf, "status")
+    end
+  end
+
+  table.sort(terminals, function(a, b)
+    return a.width > b.width
+  end)
+
+  if terminals[1] then
+    local agent = terminals[1]
+    state.main_win = agent.win
+    mark_win_role(agent.win, "main")
+    mark_buf_role(agent.buf, "agent")
+    table.insert(state.tabs, {
+      id = "adopted-" .. tostring(agent.buf),
+      name = "shell",
+      cmd = vim.o.shell or "bash",
+      buf = agent.buf,
+      status = "idle",
+    })
+    state.active = 1
+  end
+
+  if terminals[2] then
+    local scratch = terminals[2]
+    state.scratch_win = scratch.win
+    state.scratch_buf = scratch.buf
+    mark_win_role(scratch.win, "scratch")
+    mark_buf_role(scratch.buf, "scratch")
+  end
+end
+
+local function prepare_workspace_main()
+  local tab = active_tab()
+  local preferred_buf = tab and buf_valid(tab.buf) and tab.buf or nil
+
+  local main_win = ensure_main_win(preferred_buf)
+  vim.api.nvim_set_current_win(main_win)
+  if preferred_buf then
+    vim.api.nvim_win_set_buf(main_win, preferred_buf)
+  end
+
+  -- Collapse any broken/partial layout, preserving the selected main window.
   if #vim.api.nvim_list_wins() > 1 then
     vim.cmd("only")
   end
+
   state.main_win = vim.api.nvim_get_current_win()
+  mark_win_role(state.main_win, "main")
+  state.status_win = nil
+  state.scratch_win = nil
+end
+
+function M.open()
+  start_timer()
+  adopt_existing_workspace()
+
+  -- Build the workspace from a single full-height real main window. If the
+  -- user closed the file/agent main window and focus fell into a side pane,
+  -- recover the active agent buffer first so :only doesn't preserve an old
+  -- status/scratch pane as the new main area.
+  prepare_workspace_main()
 
   vim.cmd("botright vertical 44new")
   state.status_win = vim.api.nvim_get_current_win()
+  mark_win_role(state.status_win, "status")
   vim.api.nvim_win_set_buf(state.status_win, ensure_status_buf())
   vim.wo[state.status_win].number = false
   vim.wo[state.status_win].relativenumber = false
@@ -269,6 +501,7 @@ function M.open()
 
   vim.cmd("belowright split")
   state.scratch_win = vim.api.nvim_get_current_win()
+  mark_win_role(state.scratch_win, "scratch")
   vim.api.nvim_win_set_height(state.scratch_win, 10)
   ensure_scratch()
 
@@ -278,10 +511,94 @@ function M.open()
     M.focus_agent()
   end
 
-  if state.main_win and vim.api.nvim_win_is_valid(state.main_win) then
+  if win_valid(state.main_win) then
     pcall(vim.api.nvim_win_set_height, state.main_win, 999)
   end
   render_status()
+end
+
+local function layout_intact()
+  return win_valid(state.main_win) and win_valid(state.status_win) and win_valid(state.scratch_win)
+end
+
+function M.go_agent()
+  -- User-facing recovery/focus action. If the workspace chrome disappeared
+  -- (for example after closing the main file window, or after the old bad
+  -- <leader>ag created a single full-page terminal), rebuild the full layout.
+  if layout_intact() then
+    M.focus_agent()
+  else
+    M.open()
+  end
+end
+
+function M.find_files()
+  local tab = active_tab()
+  local preferred_buf = tab and buf_valid(tab.buf) and tab.buf or nil
+  vim.api.nvim_set_current_win(ensure_main_win(preferred_buf))
+
+  if Snacks and Snacks.picker then
+    Snacks.picker.files({
+      main = {
+        current = true,
+        file = false,
+      },
+      jump = {
+        close = true,
+      },
+    })
+  else
+    vim.cmd("edit .")
+  end
+end
+
+local function install_keymaps()
+  vim.keymap.set("n", "<leader>aw", M.open, { desc = "Agent workspace" })
+  vim.keymap.set("n", "<leader>aa", M.go_agent, { desc = "Focus active agent" })
+  vim.keymap.set("n", "<leader>ag", M.go_agent, { desc = "Go to active agent" })
+  vim.keymap.set("n", "<leader>as", M.focus_scratch, { desc = "Focus scratch shell" })
+  vim.keymap.set("n", "<leader>ar", function()
+    M.rename()
+  end, { desc = "Rename active agent" })
+  for i = 1, 9 do
+    vim.keymap.set("n", "<leader>a" .. i, function()
+      M.select(i)
+    end, { desc = "Agent " .. i })
+  end
+  vim.keymap.set("n", "<leader>an", function()
+    M.new()
+  end, { desc = "New agent terminal" })
+
+  -- Override LazyVim/Snacks' global <leader>ff so file selection always starts
+  -- from the pi-ide main pane, not whichever side terminal/status pane has focus.
+  vim.keymap.set("n", "<leader>ff", M.find_files, { desc = "Find files in pi-ide main area" })
+end
+
+local function refresh_workspace_buffer_keymaps()
+  if buf_valid(state.status_buf) then
+    mark_buf_role(state.status_buf, "status")
+  end
+  if buf_valid(state.scratch_buf) then
+    mark_buf_role(state.scratch_buf, "scratch")
+  end
+  for _, tab in ipairs(state.tabs) do
+    if buf_valid(tab.buf) then
+      mark_buf_role(tab.buf, "agent")
+    end
+  end
+
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if is_status_buf(buf) then
+      mark_win_role(win, "status")
+      mark_buf_role(buf, "status")
+    elseif is_scratch_buf(buf) then
+      mark_win_role(win, "scratch")
+      mark_buf_role(buf, "scratch")
+    elseif buf_role(buf) == "agent" then
+      mark_buf_role(buf, "agent")
+    end
+  end
 end
 
 function M.run(args)
@@ -297,6 +614,25 @@ function M.run(args)
 end
 
 function M.setup()
+  refresh_workspace_buffer_keymaps()
+
+  local group = vim.api.nvim_create_augroup("PiIdeWorkspace", { clear = true })
+  vim.api.nvim_create_autocmd("WinClosed", {
+    group = group,
+    callback = function(args)
+      local closed = tonumber(args.match)
+      if closed == state.main_win then
+        state.main_win = nil
+      end
+      if closed == state.status_win then
+        state.status_win = nil
+      end
+      if closed == state.scratch_win then
+        state.scratch_win = nil
+      end
+    end,
+  })
+
   vim.api.nvim_create_user_command("AgentWorkspace", function(opts)
     M.run(opts.args)
   end, { nargs = "*", complete = "shellcmd", force = true })
@@ -311,33 +647,19 @@ function M.setup()
     M.rename(opts.args)
   end, { nargs = "?", force = true })
 
-  vim.keymap.set("n", "<leader>aw", M.open, { desc = "Agent workspace" })
-  vim.keymap.set("n", "<leader>aa", M.focus_agent, { desc = "Focus active agent" })
-  vim.keymap.set("n", "<leader>as", M.focus_scratch, { desc = "Focus scratch shell" })
-  vim.keymap.set("n", "<leader>ar", function()
-    M.rename()
-  end, { desc = "Rename active agent" })
-  for i = 1, 9 do
-    vim.keymap.set("n", "<leader>a" .. i, function()
-      M.select(i)
-    end, { desc = "Agent " .. i })
-  end
-  vim.keymap.set("n", "<leader>an", function()
-    M.new()
-  end, { desc = "New agent terminal" })
+  install_keymaps()
 
-  -- In the agent workspace, file finding should open files in the main area,
-  -- even if focus is currently in the scratch terminal or status pane.
-  vim.keymap.set("n", "<leader>ff", function()
-    if state.main_win and vim.api.nvim_win_is_valid(state.main_win) then
-      vim.api.nvim_set_current_win(state.main_win)
-    end
-    if Snacks and Snacks.picker then
-      Snacks.picker.files()
-    else
-      vim.cmd("edit .")
-    end
-  end, { desc = "Find files in main area" })
+  -- LazyVim/Snacks may register its own <leader>ff after this config file is
+  -- sourced. Re-apply pi-ide keymaps once the lazy startup wave has settled.
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "VeryLazy",
+    callback = function()
+      vim.schedule(install_keymaps)
+      vim.defer_fn(install_keymaps, 100)
+    end,
+  })
+  vim.schedule(install_keymaps)
 end
 
 return M
