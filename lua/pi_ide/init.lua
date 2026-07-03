@@ -197,6 +197,40 @@ local function active_tab()
   return state.tabs[state.active]
 end
 
+local function provider_label(source)
+  if source == "claude-code" then
+    return "claude"
+  end
+  if source == "pi" or source == nil then
+    return "pi"
+  end
+  return nil
+end
+
+local function cwd_basename(cwd)
+  if not cwd or cwd == "" then
+    return nil
+  end
+  local normalized = cwd:gsub("/+$", "")
+  local name = normalized:match("([^/]+)$")
+  return name and name ~= "" and name or nil
+end
+
+local function auto_name_tab(tab, ev)
+  if tab.manual_name then
+    return
+  end
+  local provider = provider_label(ev.source)
+  local dir = cwd_basename(ev.cwd)
+  if not provider or not dir then
+    return
+  end
+  tab.name = provider .. "/" .. dir
+  if buf_valid(tab.buf) then
+    pcall(vim.api.nvim_buf_set_name, tab.buf, "agent:" .. tab.name)
+  end
+end
+
 local function ensure_main_win(preferred_buf)
   -- Keep the side panes as side panes. If the main window was closed while
   -- editing a file, do not silently reuse the focused status/scratch pane as
@@ -303,6 +337,7 @@ local function handle_event(ev)
     tab.started_at = nil
   elseif ev.event == "session_start" then
     tab.status = "idle"
+    auto_name_tab(tab, ev)
   end
   render_status()
 end
@@ -361,7 +396,11 @@ local function create_terminal_buffer(name, cmd, id, role)
   return buf
 end
 
-function M.new(name, cmd)
+function M.new(name, cmd, opts)
+  local manual_name = opts and opts.manual_name
+  if manual_name == nil then
+    manual_name = name ~= nil and name ~= ""
+  end
   name = name and name ~= "" and name or ("shell-" .. (#state.tabs + 1))
   cmd = cmd and cmd ~= "" and cmd or (vim.o.shell or "bash")
   local id = string.format("nvim-%d-%d", uv.os_getpid(), #state.tabs + 1)
@@ -370,7 +409,7 @@ function M.new(name, cmd)
   vim.api.nvim_set_current_win(state.main_win)
   local buf = create_terminal_buffer("agent:" .. name, cmd, id, "agent")
 
-  table.insert(state.tabs, { id = id, name = name, cmd = cmd, buf = buf, status = "idle" })
+  table.insert(state.tabs, { id = id, name = name, cmd = cmd, buf = buf, status = "idle", manual_name = manual_name })
   state.active = #state.tabs
   render_status()
   M.focus_agent()
@@ -387,6 +426,7 @@ function M.rename(name)
       return
     end
     tab.name = new_name
+    tab.manual_name = true
     if vim.api.nvim_buf_is_valid(tab.buf) then
       pcall(vim.api.nvim_buf_set_name, tab.buf, "agent:" .. new_name)
     end
@@ -514,7 +554,7 @@ function M.open()
   ensure_scratch()
 
   if #state.tabs == 0 then
-    M.new("shell", vim.o.shell or "bash")
+    M.new("shell", vim.o.shell or "bash", { manual_name = false })
   else
     M.focus_agent()
   end

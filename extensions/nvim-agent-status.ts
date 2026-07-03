@@ -18,6 +18,7 @@ function emit(event: string, data: Record<string, unknown> = {}) {
     JSON.stringify({
       ts: Date.now(),
       pid: process.pid,
+      source: "pi",
       agentId,
       event,
       ...data,

@@ -151,7 +151,7 @@ pi
 claude
 ```
 
-When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
+When the agent session starts, the tab is named from the agent and working directory, such as `pi/pi-ide` or `claude/pi-ide`. When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
 
 ### Commands
 
@@ -162,7 +162,7 @@ When the agent starts processing a prompt, the tab becomes `🤔 running`. When 
 | `:AgentNew name` | Create a new agent tab named `name` |
 | `:AgentNew name command` | Create a tab running `command` |
 | `:AgentSelect 2` | Switch main area to agent tab 2 |
-| `:AgentRename name` | Rename the active agent tab |
+| `:AgentRename name` | Rename the active agent tab; manual names are sticky and are not overwritten by automatic agent/cwd naming |
 
 Examples:
 

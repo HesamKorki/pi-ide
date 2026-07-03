@@ -67,3 +67,56 @@ test("Neovim status reader recovers when the event file is truncated", async () 
     assert.equal(result.status, 0, result.stderr || result.stdout);
   });
 });
+
+test("Neovim auto-names Claude tabs from provider and working directory", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local s=_G.__pi_ide_state
+       local tab=s.tabs[1]
+       vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
+       local f=assert(io.open(s.event_file, "w"))
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="claude-code",cwd="/tmp/projects/pi-ide"}) .. "\\n")
+       f:close()
+       assert(vim.wait(2500, function() return tab.name == "claude/pi-ide" end, 50), "expected claude/pi-ide, got " .. tostring(tab.name))`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
+
+test("Neovim auto-names Pi tabs from provider and working directory", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local s=_G.__pi_ide_state
+       local tab=s.tabs[1]
+       vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
+       local f=assert(io.open(s.event_file, "w"))
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide"}) .. "\\n")
+       f:close()
+       assert(vim.wait(2500, function() return tab.name == "pi/pi-ide" end, 50), "expected pi/pi-ide, got " .. tostring(tab.name))`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
+
+test("Manual tab names are not overwritten by agent session events", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local s=_G.__pi_ide_state
+       local tab=s.tabs[1]
+       require("pi_ide").rename("backend")
+       vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
+       local f=assert(io.open(s.event_file, "w"))
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide"}) .. "\\n")
+       f:close()
+       vim.wait(1500, function() return false end, 50)
+       assert(tab.name == "backend", "expected backend to remain sticky, got " .. tostring(tab.name))`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
