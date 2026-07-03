@@ -294,6 +294,9 @@ local function handle_event(ev)
     tab.status = "done"
     tab.started_at = nil
     tab.summary = ev.summary
+  elseif ev.event == "agent_failed" then
+    tab.status = "failed"
+    tab.started_at = nil
   elseif ev.event == "session_shutdown" then
     tab.status = "stopped"
     tab.started_at = nil

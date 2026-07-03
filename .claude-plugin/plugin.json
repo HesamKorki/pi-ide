@@ -1,0 +1,14 @@
+{
+  "name": "pi-ide",
+  "displayName": "pi-ide",
+  "version": "0.1.0",
+  "description": "Claude Code hooks for pi-ide Neovim agent status tracking",
+  "author": {
+    "name": "Hesam Korki"
+  },
+  "homepage": "https://github.com/HesamKorki/pi-ide",
+  "repository": "https://github.com/HesamKorki/pi-ide",
+  "license": "MIT",
+  "keywords": ["claude-code", "hooks", "neovim", "agent", "status"],
+  "hooks": "./hooks/hooks.json"
+}

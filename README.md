@@ -1,6 +1,6 @@
 # pi-ide
 
-A small Neovim workspace for running multiple [`pi`](https://pi.dev) agent shells while keeping normal development tools one keystroke away.
+A small Neovim workspace for running multiple [`pi`](https://pi.dev) or Claude Code agent shells while keeping normal development tools one keystroke away.
 
 The premise is simple: the bottleneck in software development is increasingly **attention**. You may have several agents, test runs, and shell tasks moving at the same time, but constantly switching terminals makes it hard to know what needs your focus. `pi-ide` gives you a minimal control room: big interactive agent terminals, a compact status view, a scratch shell, and the usual file picker/editor workflow.
 
@@ -21,8 +21,8 @@ The premise is simple: the bottleneck in software development is increasingly **
   - a large main area for the active agent shell or normal file editing
   - a compact agent/status panel
   - a small scratch terminal for ad-hoc commands
-- Lets you run plain `zsh`/`bash` agent tabs and type `pi` yourself.
-- Tracks `pi` lifecycle status automatically when `pi` runs inside a managed agent shell.
+- Lets you run plain `zsh`/`bash` agent tabs and type `pi` or `claude` yourself.
+- Tracks `pi` and Claude Code lifecycle status automatically when they run inside a managed agent shell.
 - Lets you switch agents by keymap or mouse click.
 - Keeps file navigation/editing available through your existing Neovim setup.
 
@@ -31,36 +31,41 @@ Status icons:
 | Icon | Meaning |
 | --- | --- |
 | 🟢 | idle / ready |
-| 🤔 | pi agent is running |
-| ✅ | pi agent finished its turn |
+| 🤔 | agent is running |
+| ✅ | agent finished its turn |
 | 🛑 | shell stopped |
 | ❌ | shell failed |
 | ❔ | unknown |
 
 ## How status tracking works
 
-`pi-ide` has two parts:
+`pi-ide` has three integration points:
 
 1. **Pi extension**: `extensions/nvim-agent-status.ts`
    - listens to Pi lifecycle events such as `agent_start` and `agent_end`
    - writes structured JSONL events to `/tmp/pi-agent-status-$USER/events.jsonl`
-2. **Neovim plugin**: `lua/pi_ide/init.lua`
+2. **Claude Code plugin hooks**: `.claude-plugin/plugin.json`, `hooks/hooks.json`, and `scripts/claude-agent-status.mjs`
+   - listens to Claude Code lifecycle hooks such as `UserPromptSubmit`, `Stop`, `StopFailure`, and `SessionEnd`
+   - writes the same structured JSONL event format when `claude` inherits `NVIM_AGENT_ID` from a managed terminal
+3. **Neovim plugin**: `lua/pi_ide/init.lua`
    - starts managed shell terminals with `NVIM_AGENT_ID`
    - watches the JSONL event file
    - updates the agent status panel
 
-This avoids brittle prompt parsing. The status comes from Pi's own lifecycle events, not from guessing whether a terminal prompt returned.
+This avoids brittle prompt parsing. The status comes from agent lifecycle events, not from guessing whether a terminal prompt returned.
 
 ## Requirements
 
 - Neovim 0.10+
-- `pi` installed
+- `pi` installed for Pi status tracking
+- Claude Code installed for Claude status tracking
+- Node.js available on `PATH` for Claude Code hook execution
 - A shell such as `zsh` or `bash`
 - Optional but recommended: LazyVim / Snacks picker for `<leader>ff`
 
 ## Installation
 
-You should install both halves from the same repository.
+You should install the Neovim plugin and whichever agent integrations you use from the same repository.
 
 ### 1. Install the Pi package
 
@@ -83,6 +88,37 @@ You can verify it is installed with:
 ```bash
 pi list
 ```
+
+### 1b. Install the Claude Code plugin hooks
+
+If you want Claude Code status tracking, install this repo as a Claude Code plugin too.
+
+For local development, start Claude Code with this plugin directory:
+
+```bash
+claude --plugin-dir /path/to/pi-ide
+```
+
+For persistent user installation, link this repo into Claude Code's personal skills directory:
+
+```bash
+mkdir -p ~/.claude/skills
+ln -s /path/to/pi-ide ~/.claude/skills/pi-ide
+```
+
+Then start a new Claude Code session and verify the plugin is visible:
+
+```bash
+claude plugin list
+```
+
+Inside `:AgentWorkspace`, type:
+
+```bash
+claude
+```
+
+When you submit a prompt, the tab becomes `🤔 running`. When Claude Code finishes the turn, it becomes `✅ done`. If a turn fails, it becomes `❌ failed`.
 
 ### 2. Install the Neovim plugin
 
@@ -107,13 +143,15 @@ Open the workspace:
 :AgentWorkspace
 ```
 
-The default agent tab is a normal shell. Type `pi` there when you want an agent session:
+The default agent tab is a normal shell. Type `pi` or `claude` there when you want an agent session:
 
 ```bash
 pi
+# or
+claude
 ```
 
-When Pi starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
+When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
 
 ### Commands
 
@@ -173,8 +211,8 @@ The plugin guards against reusing the status/scratch panes as the main area, but
 
 ## Limitations
 
-- Automatic `running`/`done` status is for `pi` sessions running inside managed agent shells.
-- Generic shell commands do not emit Pi lifecycle events; their terminal status only changes when the shell exits.
+- Automatic `running`/`done` status is for `pi` and Claude Code sessions running inside managed agent shells with their corresponding integration installed.
+- Generic shell commands do not emit agent lifecycle events; their terminal status only changes when the shell exits.
 - The UI is intentionally minimal. It is not a replacement for tmux, terminal multiplexers, or full IDE project views.
 - Emoji alignment depends on your terminal/font. If spacing looks odd, switch to a font with better emoji width support or patch the icons locally.
 

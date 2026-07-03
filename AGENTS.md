@@ -45,6 +45,10 @@ pi install npm:@hesam.korki/pi-ide
 
 Never run `git push` unless the user's latest prompt explicitly asks to push.
 
+For this GitHub-hosted project, do not GPG-sign commits. If local Git config has commit signing enabled, use `git commit --no-gpg-sign ...`.
+
+Agent planning artifacts are local-only. Do not commit or push `docs/superpowers/` plans/specs; keep them untracked or remove them before committing feature work.
+
 ## Manual verification
 
 Neovim plugin smoke test:
