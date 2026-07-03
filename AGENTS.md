@@ -49,6 +49,8 @@ For this GitHub-hosted project, do not GPG-sign commits. If local Git config has
 
 Agent planning artifacts are local-only. Do not commit or push `docs/superpowers/` plans/specs; keep them untracked or remove them before committing feature work.
 
+When running tests or manual checks that write Pi/Claude agent status events, always set `NVIM_AGENT_STATUS_DIR` to a temporary directory. Never truncate or write `/tmp/pi-agent-status-$USER/events.jsonl` during verification because a live Neovim workspace may be polling it.
+
 ## Manual verification
 
 Neovim plugin smoke test:

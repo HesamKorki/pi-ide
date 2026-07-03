@@ -1,6 +1,11 @@
 local M = {}
 
 local uv = vim.uv or vim.loop
+
+local function status_dir()
+  return vim.env.NVIM_AGENT_STATUS_DIR or ("/tmp/pi-agent-status-" .. (vim.env.USER or "unknown"))
+end
+
 local state = _G.__pi_ide_state or {
   tabs = {},
   active = 1,
@@ -10,7 +15,7 @@ local state = _G.__pi_ide_state or {
   scratch_win = nil,
   scratch_buf = nil,
   timer = nil,
-  event_file = "/tmp/pi-agent-status-" .. (vim.env.USER or "unknown") .. "/events.jsonl",
+  event_file = status_dir() .. "/events.jsonl",
   event_pos = 0,
 }
 _G.__pi_ide_state = state
@@ -135,10 +140,6 @@ local function find_unmanaged_window()
     end
   end
   return nil
-end
-
-local function status_dir()
-  return "/tmp/pi-agent-status-" .. (vim.env.USER or "unknown")
 end
 
 local function ensure_status_buf()
@@ -310,6 +311,10 @@ local function poll_events()
   local fd = io.open(state.event_file, "r")
   if not fd then
     return
+  end
+  local size = fd:seek("end") or 0
+  if state.event_pos > size then
+    state.event_pos = 0
   end
   fd:seek("set", state.event_pos)
   for line in fd:lines() do
