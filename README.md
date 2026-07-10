@@ -151,7 +151,7 @@ pi
 claude
 ```
 
-When the agent session starts, the tab is named from the agent and working directory, such as `pi/pi-ide` or `claude/pi-ide`. When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
+When the agent session starts, the tab is named from the agent and working directory, such as `pi/pi-ide` or `claude/pi-ide`. When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done` and shows a compact summary from the agent's final response.
 
 ### Commands
 

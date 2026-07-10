@@ -58,11 +58,31 @@ test("maps UserPromptSubmit to agent_start", async () => {
   });
 });
 
+test("maps Stop to agent_end with a summary", async () => {
+  await withTempDir(async (dir) => {
+    const result = runHook(
+      {
+        hook_event_name: "Stop",
+        cwd: "/repo",
+        session_id: "s1",
+        prompt_id: "p2",
+        last_assistant_message: "Implemented the requested change.\n\nDetails follow.",
+      },
+      { NVIM_AGENT_ID: "nvim-2", NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const events = await readEvents(dir);
+    assert.equal(events[0].event, "agent_end");
+    assert.equal(events[0].summary, "Implemented the requested change.");
+  });
+});
+
 test("maps StopFailure to agent_failed", async () => {
   await withTempDir(async (dir) => {
     const result = runHook(
-      { hook_event_name: "StopFailure", cwd: "/repo", session_id: "s1", prompt_id: "p2", error_type: "rate_limit" },
-      { NVIM_AGENT_ID: "nvim-2", NVIM_AGENT_STATUS_DIR: dir }
+      { hook_event_name: "StopFailure", cwd: "/repo", session_id: "s1", prompt_id: "p3", error_type: "rate_limit" },
+      { NVIM_AGENT_ID: "nvim-3", NVIM_AGENT_STATUS_DIR: dir }
     );
 
     assert.equal(result.status, 0, result.stderr);
