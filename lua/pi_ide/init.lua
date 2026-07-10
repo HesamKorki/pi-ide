@@ -164,17 +164,6 @@ local function ensure_status_buf()
   return state.status_buf
 end
 
-local function compact_summary(summary)
-  if not summary or summary == "" then
-    return ""
-  end
-  summary = summary:gsub("%s+", " ")
-  if #summary > 60 then
-    summary = summary:sub(1, 57) .. "..."
-  end
-  return " · " .. summary
-end
-
 local function render_status()
   local buf = ensure_status_buf()
   if not vim.api.nvim_buf_is_valid(buf) then
@@ -189,7 +178,7 @@ local function render_status()
     if tab.status == "running" and tab.started_at then
       elapsed = string.format(" %ds", math.floor((uv.now() - tab.started_at) / 1000))
     end
-    table.insert(lines, string.format("%s [%d] %-12s %s %s%s%s", current, i, tab.name, icon, tab.status, elapsed, compact_summary(tab.summary)))
+    table.insert(lines, string.format("%s [%d] %-12s %s %s%s", current, i, tab.name, icon, tab.status, elapsed))
   end
   if #state.tabs == 0 then
     table.insert(lines, "  <leader>an new")
@@ -336,7 +325,6 @@ local function handle_event(ev)
   if ev.event == "agent_start" then
     tab.status = "running"
     tab.started_at = uv.now()
-    tab.summary = nil
   elseif ev.event == "agent_end" then
     tab.status = "done"
     tab.started_at = nil
@@ -344,7 +332,6 @@ local function handle_event(ev)
   elseif ev.event == "agent_failed" then
     tab.status = "failed"
     tab.started_at = nil
-    tab.summary = ev.summary
   elseif ev.event == "session_shutdown" then
     tab.status = "stopped"
     tab.started_at = nil

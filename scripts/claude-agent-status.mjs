@@ -39,11 +39,6 @@ function timestamp() {
   return fixed ? Number(fixed) : Date.now();
 }
 
-function firstLine(text) {
-  if (typeof text !== "string") return undefined;
-  return text.split("\n").find((line) => line.trim() !== "")?.trim().slice(0, 200);
-}
-
 function eventPayload(input, event) {
   const payload = {
     ts: timestamp(),
@@ -57,8 +52,6 @@ function eventPayload(input, event) {
   if (input.session_id) payload.sessionId = input.session_id;
   if (input.prompt_id) payload.promptId = input.prompt_id;
   if (input.error_type) payload.errorType = input.error_type;
-  const summary = firstLine(input.last_assistant_message);
-  if (summary) payload.summary = summary;
 
   return payload;
 }

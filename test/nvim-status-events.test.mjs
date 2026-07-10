@@ -68,26 +68,6 @@ test("Neovim status reader recovers when the event file is truncated", async () 
   });
 });
 
-test("Neovim renders agent end summaries in the status panel", async () => {
-  await withTempDir(async (dir) => {
-    const result = runNvim(
-      `local s=_G.__pi_ide_state
-       local tab=s.tabs[1]
-       vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
-       local f=assert(io.open(s.event_file, "w"))
-       f:write(vim.json.encode({agentId=tab.id,event="agent_end",summary="Implemented the requested change."}) .. "\\n")
-       f:close()
-       assert(vim.wait(2500, function()
-         local lines=vim.api.nvim_buf_get_lines(s.status_buf, 0, -1, false)
-         return table.concat(lines, "\\n"):find("Implemented the requested change", 1, true) ~= nil
-       end, 50), "expected summary to appear in status panel")`,
-      { NVIM_AGENT_STATUS_DIR: dir }
-    );
-
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-  });
-});
-
 test("Neovim auto-names Claude tabs from provider and working directory", async () => {
   await withTempDir(async (dir) => {
     const result = runNvim(
