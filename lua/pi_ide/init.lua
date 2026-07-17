@@ -378,7 +378,7 @@ local function create_terminal_buffer(name, cmd, id, role)
   vim.api.nvim_buf_set_name(buf, name)
   mark_buf_role(buf, role or "agent")
   vim.api.nvim_set_current_buf(buf)
-  vim.fn.termopen(cmd, {
+  local job = vim.fn.termopen(cmd, {
     env = {
       NVIM_AGENT_ID = id,
       NVIM_AGENT_STATUS_DIR = status_dir(),
@@ -393,7 +393,7 @@ local function create_terminal_buffer(name, cmd, id, role)
       vim.schedule(render_status)
     end,
   })
-  return buf
+  return buf, job
 end
 
 function M.new(name, cmd, opts)
@@ -407,12 +407,57 @@ function M.new(name, cmd, opts)
 
   ensure_main_win()
   vim.api.nvim_set_current_win(state.main_win)
-  local buf = create_terminal_buffer("agent:" .. name, cmd, id, "agent")
+  local buf, job = create_terminal_buffer("agent:" .. name, cmd, id, "agent")
 
-  table.insert(state.tabs, { id = id, name = name, cmd = cmd, buf = buf, status = "idle", manual_name = manual_name })
+  table.insert(state.tabs, { id = id, name = name, cmd = cmd, buf = buf, job = job, status = "idle", manual_name = manual_name })
   state.active = #state.tabs
   render_status()
   M.focus_agent()
+end
+
+local function job_running(job)
+  if not job then
+    return false
+  end
+  local ok, result = pcall(vim.fn.jobwait, { job }, 0)
+  return ok and result and result[1] == -1
+end
+
+local function stop_tab_job(tab)
+  if tab and job_running(tab.job) then
+    pcall(vim.fn.jobstop, tab.job)
+  end
+end
+
+function M.delete(idx)
+  idx = tonumber(idx) or state.active
+  local tab = state.tabs[idx]
+  if not tab then
+    vim.notify("No agent tab " .. tostring(idx), vim.log.levels.WARN)
+    return
+  end
+
+  stop_tab_job(tab)
+  if buf_valid(tab.buf) then
+    pcall(vim.api.nvim_buf_delete, tab.buf, { force = true })
+  end
+
+  local was_active = idx == state.active
+  table.remove(state.tabs, idx)
+  if #state.tabs == 0 then
+    state.active = 1
+    render_status()
+    return
+  end
+  if idx < state.active then
+    state.active = state.active - 1
+  elseif was_active then
+    state.active = math.min(idx, #state.tabs)
+  end
+  render_status()
+  if was_active then
+    M.focus_agent()
+  end
 end
 
 function M.rename(name)
@@ -608,6 +653,7 @@ local function install_keymaps()
   vim.keymap.set("n", "<leader>ar", function()
     M.rename()
   end, { desc = "Rename active agent" })
+  vim.keymap.set("n", "<leader>ad", M.delete, { desc = "Delete active agent" })
   for i = 1, 9 do
     vim.keymap.set("n", "<leader>a" .. i, function()
       M.select(i)
@@ -693,6 +739,9 @@ function M.setup()
   end, { nargs = 1, force = true })
   vim.api.nvim_create_user_command("AgentRename", function(opts)
     M.rename(opts.args)
+  end, { nargs = "?", force = true })
+  vim.api.nvim_create_user_command("AgentDelete", function(opts)
+    M.delete(opts.args)
   end, { nargs = "?", force = true })
 
   install_keymaps()

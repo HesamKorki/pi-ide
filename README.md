@@ -163,6 +163,8 @@ When the agent session starts, the tab is named from the agent and working direc
 | `:AgentNew name command` | Create a tab running `command` |
 | `:AgentSelect 2` | Switch main area to agent tab 2 |
 | `:AgentRename name` | Rename the active agent tab; manual names are sticky and are not overwritten by automatic agent/cwd naming |
+| `:AgentDelete` | Stop and remove the active agent tab |
+| `:AgentDelete 2` | Stop and remove agent tab 2 |
 
 Examples:
 
@@ -186,6 +188,7 @@ Default keymaps installed by `require("pi_ide").setup()`:
 | `<leader>as` | Focus the scratch shell |
 | `<leader>an` | New agent shell |
 | `<leader>ar` | Rename active agent shell |
+| `<leader>ad` | Stop and remove the active agent shell |
 | `<leader>a1` ... `<leader>a9` | Switch to agent tab 1–9 |
 | `<leader>ff` | Open file picker in the main area |
 

@@ -120,3 +120,28 @@ test("Manual tab names are not overwritten by agent session events", async () =>
     assert.equal(result.status, 0, result.stderr || result.stdout);
   });
 });
+
+test("AgentDelete removes the active agent and stops its terminal job", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local M=require("pi_ide")
+       local s=_G.__pi_ide_state
+       local before=#s.tabs
+       M.new("victim", {"sh", "-c", "sleep 30"})
+       local victim=s.tabs[s.active]
+       local job=victim.job
+       assert(job and job > 0, "expected active tab to store terminal job id")
+       assert(vim.fn.jobwait({job}, 0)[1] == -1, "expected job to be running before delete")
+       M.delete()
+       assert(#s.tabs == before, "expected delete to remove one tab")
+       for _, tab in ipairs(s.tabs) do
+         assert(tab.id ~= victim.id, "deleted tab still present")
+       end
+       assert(vim.wait(2500, function() return vim.fn.jobwait({job}, 0)[1] ~= -1 end, 50), "expected delete to stop terminal job")
+       assert(vim.api.nvim_get_commands({}).AgentDelete ~= nil, "expected :AgentDelete command")`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
