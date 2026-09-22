@@ -77,12 +77,7 @@ function install_workspace_buffer_keymaps(buf)
     M.find_files()
   end, { buffer = buf, desc = "Find files in pi-ide main area" })
 
-  vim.keymap.set({ "n", "t" }, "<leader>ag", function()
-    if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
-      vim.cmd("stopinsert")
-    end
-    M.go_agent()
-  end, { buffer = buf, desc = "Go to active agent" })
+  vim.keymap.set("n", "<leader>ag", M.go_agent, { buffer = buf, desc = "Go to active agent" })
 
   vim.keymap.set({ "n", "t" }, "<leader>aa", function()
     if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
