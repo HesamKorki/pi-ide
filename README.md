@@ -191,6 +191,12 @@ Default keymaps installed by `require("pi_ide").setup()`:
 | `<leader>ad` | Stop and remove the active agent shell |
 | `<leader>a1` ... `<leader>a9` | Switch to agent tab 1–9 |
 | `<leader>ff` | Open file picker in the main area |
+| `Ctrl+Shift+↑` | Jump to the previous Pi user prompt |
+| `Ctrl+Shift+↓` | Jump to the next Pi user prompt |
+
+Prompt navigation uses Pi's OSC-133 markers and Neovim's native terminal `[[` / `]]`
+motions. It leaves terminal-input mode so scrollback stays at the selected prompt;
+press `i` to resume typing. The mappings apply only to managed agent terminals.
 
 You can also click an agent row in the status panel to switch to it.
 

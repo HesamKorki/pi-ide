@@ -37,6 +37,13 @@ local function buf_valid(buf)
   return buf and vim.api.nvim_buf_is_valid(buf)
 end
 
+local function jump_terminal_prompt(motion)
+  if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
+    vim.cmd("stopinsert")
+  end
+  vim.cmd("normal! " .. motion)
+end
+
 local install_workspace_buffer_keymaps
 
 local function mark_buf_role(buf, role)
@@ -85,6 +92,15 @@ function install_workspace_buffer_keymaps(buf)
     end
     M.go_agent()
   end, { buffer = buf, desc = "Focus active agent" })
+
+  if vim.b[buf].pi_ide_role == "agent" then
+    vim.keymap.set({ "n", "t" }, "<C-S-Up>", function()
+      jump_terminal_prompt("[[")
+    end, { buffer = buf, desc = "Previous agent prompt" })
+    vim.keymap.set({ "n", "t" }, "<C-S-Down>", function()
+      jump_terminal_prompt("]]")
+    end, { buffer = buf, desc = "Next agent prompt" })
+  end
 end
 
 local function is_status_buf(buf)
