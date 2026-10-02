@@ -40,8 +40,12 @@ end
 local function jump_terminal_prompt(motion)
   if vim.api.nvim_get_mode().mode:sub(1, 1) == "t" then
     vim.cmd("stopinsert")
+    vim.schedule(function()
+      vim.cmd("normal " .. motion)
+    end)
+    return
   end
-  vim.cmd("normal! " .. motion)
+  vim.cmd("normal " .. motion)
 end
 
 local install_workspace_buffer_keymaps
