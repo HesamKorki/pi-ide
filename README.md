@@ -59,7 +59,7 @@ This avoids brittle prompt parsing. The status comes from agent lifecycle events
 - Neovim 0.10+
 - `pi` installed for Pi status tracking
 - Claude Code installed for Claude status tracking
-- Node.js available on `PATH` for Claude Code hook execution
+- Node.js available on `PATH` for Claude Code hook execution (22.19+ to run the tests)
 - A shell such as `zsh` or `bash`
 - Optional but recommended: LazyVim / Snacks picker for `<leader>ff`
 
@@ -151,7 +151,7 @@ pi
 claude
 ```
 
-When the agent session starts, the tab is named from the agent and working directory, such as `pi/pi-ide` or `claude/pi-ide`. When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
+Tabs use short `harness/directory@MM-DD` labels, such as `pi/openshell@10-12` or `claude/pi-ide@10-12`. Only the working directory's basename is shown (at most 16 characters). Pi uses the original session creation date in UTC, so resumed sessions keep their date; Claude Code and older integrations use the session-start event date. Session titles and first prompts are never used. Manual `:AgentRename` names remain sticky. When the agent starts processing a prompt, the tab becomes `🤔 running`. When the turn ends, it becomes `✅ done`.
 
 ### Commands
 
@@ -255,6 +255,17 @@ Or install the local package:
 
 ```bash
 pi install /path/to/pi-ide
+```
+
+Local packages load directly from the checkout without copying. If you previously copied
+`nvim-agent-status.ts` into `~/.pi/agent/extensions/`, move that copy outside the
+extensions directory to avoid duplicate events. Run `/reload` in Pi and restart
+Neovim after changing the integration.
+
+Run the regression tests with Node.js 22.19+ (includes native TypeScript loading):
+
+```bash
+npm test
 ```
 
 ## Philosophy

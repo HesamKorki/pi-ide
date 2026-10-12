@@ -75,9 +75,9 @@ test("Neovim auto-names Claude tabs from provider and working directory", async 
        local tab=s.tabs[1]
        vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
        local f=assert(io.open(s.event_file, "w"))
-       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="claude-code",cwd="/tmp/projects/pi-ide"}) .. "\\n")
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="claude-code",cwd="/tmp/projects/pi-ide",ts=1791806400000}) .. "\\n")
        f:close()
-       assert(vim.wait(2500, function() return tab.name == "claude/pi-ide" end, 50), "expected claude/pi-ide, got " .. tostring(tab.name))`,
+       assert(vim.wait(2500, function() return tab.name == "claude/pi-ide@10-12" end, 50), "expected claude/pi-ide@10-12, got " .. tostring(tab.name))`,
       { NVIM_AGENT_STATUS_DIR: dir }
     );
 
@@ -92,9 +92,51 @@ test("Neovim auto-names Pi tabs from provider and working directory", async () =
        local tab=s.tabs[1]
        vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
        local f=assert(io.open(s.event_file, "w"))
-       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide"}) .. "\\n")
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide",ts=1791806400000}) .. "\\n")
        f:close()
-       assert(vim.wait(2500, function() return tab.name == "pi/pi-ide" end, 50), "expected pi/pi-ide, got " .. tostring(tab.name))`,
+       assert(vim.wait(2500, function() return tab.name == "pi/pi-ide@10-12" end, 50), "expected pi/pi-ide@10-12, got " .. tostring(tab.name))`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
+
+test("Neovim uses the original Pi session date and ignores prompt-based titles", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local s=_G.__pi_ide_state
+       local tab=s.tabs[1]
+       vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
+       local f=assert(io.open(s.event_file, "w"))
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide/",sessionName=string.rep("first prompt ", 100),sessionStartedAt="2026-09-22T14:00:00.000Z",ts=1791806400000}) .. "\\n")
+       f:close()
+       assert(vim.wait(2500, function() return tab.name == "pi/pi-ide@09-22" end, 50), "expected original session date, got " .. tostring(tab.name))
+       assert(vim.api.nvim_buf_get_name(tab.buf):match("agent:pi/pi%-ide@09%-22$"), "expected buffer name to follow label")`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
+
+test("Pi labels stay short and update when switching sessions", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local s=_G.__pi_ide_state
+       local tab=s.tabs[1]
+       vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
+       local function emit(cwd, date)
+         local f=assert(io.open(s.event_file, "a"))
+         f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd=cwd,sessionStartedAt=date}) .. "\\n")
+         f:close()
+       end
+       emit("/tmp/projects/agentic-gateway-backend", "2026-09-22T14:00:00.000Z")
+       assert(vim.wait(2500, function() return tab.name == "pi/agentic-gateway…@09-22" end, 50), "expected short basename, got " .. tostring(tab.name))
+       emit("/tmp/projects/other", "2026-10-12T14:00:00.000Z")
+       assert(vim.wait(2500, function() return tab.name == "pi/other@10-12" end, 50), "expected new session label")
+       emit("/tmp/projects/ééééééééééééééééé", "2026-10-12T14:00:00.000Z")
+       assert(vim.wait(2500, function() return tab.name == "pi/ééééééééééééééé…@10-12" end, 50), "must truncate characters, not UTF-8 bytes")`,
       { NVIM_AGENT_STATUS_DIR: dir }
     );
 
@@ -110,7 +152,8 @@ test("Manual tab names are not overwritten by agent session events", async () =>
        require("pi_ide").rename("backend")
        vim.fn.mkdir(vim.fn.fnamemodify(s.event_file, ":h"), "p")
        local f=assert(io.open(s.event_file, "w"))
-       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide"}) .. "\\n")
+       f:write(vim.json.encode({agentId=tab.id,event="session_start",source="pi",cwd="/tmp/projects/pi-ide",sessionName="Session name"}) .. "\\n")
+       f:write(vim.json.encode({agentId=tab.id,event="session_info_changed",source="pi",cwd="/tmp/projects/pi-ide",sessionName="Renamed session"}) .. "\\n")
        f:close()
        vim.wait(1500, function() return false end, 50)
        assert(tab.name == "backend", "expected backend to remain sticky, got " .. tostring(tab.name))`,

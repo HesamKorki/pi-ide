@@ -240,7 +240,14 @@ local function auto_name_tab(tab, ev)
   if not provider or not dir then
     return
   end
-  tab.name = provider .. "/" .. dir
+  if vim.fn.strchars(dir) > 16 then
+    dir = vim.fn.strcharpart(dir, 0, 15) .. "…"
+  end
+  -- Pi supplies the original session timestamp; older integrations and Claude
+  -- fall back to the event date. Keep dates in UTC, matching Pi's session header.
+  local date = type(ev.sessionStartedAt) == "string" and ev.sessionStartedAt:match("^%d%d%d%d%-(%d%d%-%d%d)")
+  date = date or os.date("!%m-%d", type(ev.ts) == "number" and math.floor(ev.ts / 1000) or os.time())
+  tab.name = provider .. "/" .. dir .. "@" .. date
   if buf_valid(tab.buf) then
     pcall(vim.api.nvim_buf_set_name, tab.buf, "agent:" .. tab.name)
   end

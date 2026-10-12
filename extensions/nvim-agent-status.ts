@@ -45,7 +45,7 @@ function firstAssistantLine(messages: { role?: string; content?: unknown }[]): s
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
-    emit("session_start", { cwd: ctx.cwd, sessionName: pi.getSessionName?.() });
+    emit("session_start", { cwd: ctx.cwd, sessionStartedAt: ctx.sessionManager.getHeader()?.timestamp });
   });
 
   pi.on("agent_start", async () => {
