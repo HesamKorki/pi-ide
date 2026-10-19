@@ -17,6 +17,7 @@ local state = _G.__pi_ide_state or {
   timer = nil,
   event_file = status_dir() .. "/events.jsonl",
   event_pos = 0,
+  agent_seq = 0,
 }
 _G.__pi_ide_state = state
 
@@ -312,18 +313,31 @@ function M.select(idx)
   M.focus_agent()
 end
 
-local function handle_event(ev)
-  local idx
-  for i, tab in ipairs(state.tabs) do
-    if tab.id == ev.agentId then
-      idx = i
-      break
+local function find_tab(id)
+  for _, tab in ipairs(state.tabs) do
+    if tab.id == id then
+      return tab
     end
   end
-  if not idx then
+  return nil
+end
+
+-- Agent ids route status events to tabs, so they must never be reused while a
+-- tab is open, even after deletes or a module reload with persisted state.
+local function next_agent_id()
+  local id
+  repeat
+    state.agent_seq = (state.agent_seq or 0) + 1
+    id = string.format("nvim-%d-%d", uv.os_getpid(), state.agent_seq)
+  until not find_tab(id)
+  return id
+end
+
+local function handle_event(ev)
+  local tab = find_tab(ev.agentId)
+  if not tab then
     return
   end
-  local tab = state.tabs[idx]
   if ev.event == "agent_start" then
     tab.status = "running"
     tab.started_at = uv.now()
@@ -405,7 +419,7 @@ function M.new(name, cmd, opts)
   end
   name = name and name ~= "" and name or ("shell-" .. (#state.tabs + 1))
   cmd = cmd and cmd ~= "" and cmd or (vim.o.shell or "bash")
-  local id = string.format("nvim-%d-%d", uv.os_getpid(), #state.tabs + 1)
+  local id = next_agent_id()
 
   ensure_main_win()
   vim.api.nvim_set_current_win(state.main_win)

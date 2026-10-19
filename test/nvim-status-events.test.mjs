@@ -188,3 +188,30 @@ test("AgentDelete removes the active agent and stops its terminal job", async ()
     assert.equal(result.status, 0, result.stderr || result.stdout);
   });
 });
+
+test("Agent ids stay unique after deleting a tab", async () => {
+  await withTempDir(async (dir) => {
+    const result = runNvim(
+      `local M=require("pi_ide")
+       local s=_G.__pi_ide_state
+       M.new("second")
+       M.new("third")
+       M.delete(1)
+       M.new("fourth")
+       local seen={}
+       for _, tab in ipairs(s.tabs) do
+         assert(not seen[tab.id], "duplicate agent id " .. tab.id)
+         seen[tab.id]=true
+       end
+       local second, fourth=s.tabs[1], s.tabs[3]
+       local f=assert(io.open(s.event_file, "w"))
+       f:write(vim.json.encode({agentId=fourth.id,event="agent_start"}) .. "\\n")
+       f:close()
+       assert(vim.wait(2500, function() return fourth.status == "running" end, 50), "expected new tab to receive its own events")
+       assert(second.status == "idle", "expected other tabs to keep their status, got " .. tostring(second.status))`,
+      { NVIM_AGENT_STATUS_DIR: dir }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+});
